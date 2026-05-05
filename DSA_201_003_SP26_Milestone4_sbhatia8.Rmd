@@ -1,260 +1,30 @@
 ---
-title: "AI vs. Human Content Detection: A Multilingual Analysis"
+title: "DSA_201_003_SP26_Milestone4_sbhatia8.Rmd"
 author: "Shradha Bhatia"
-date: "`r Sys.Date()`"
-output: pdf_document
+date: "2026-05-05"
+output: html_document
 ---
 
-# Introduction
-
-The rise of large language models (LLMs) like Llama, Gemma, and GPT-based systems has made it increasingly difficult to distinguish AI-generated text from human-written content. This has real consequences in education, journalism, and professional settings, where the authenticity of written work matters. Existing detection tools often rely on English-only or single-model datasets, which limits their effectiveness in practice.
-
-This report analyzes the **AI vs. Human Content Detection Dataset (2026 Edition)**, created by Muhammad Afaq Bhatti and made publicly available on Kaggle. The dataset was generated on January 29, 2026, by collecting human-written text samples and pairing them with AI-generated samples produced using models including Llama 3.1 8B Instant, Llama 3.3 70B, and Gemma 2 9B. A subset of AI samples were then lightly or heavily post-edited by humans, creating three distinct content categories.
-
-The dataset contains **686 observations** and **11 variables**:
-
-- `id`: Unique UUID string for each sample
-- `text`: Full text of the sample
-- `human_or_ai`: Label indicating whether the content is human-written, AI-generated, or post-edited AI
-- `source_model`: The AI model that generated the text, or "Human" for human-written samples
-- `prompt`: The original prompt used to generate AI content (null for human samples)
-- `domain`: Content domain (Education, Email, Marketing, News, Social Media, Technical Blog)
-- `language`: ISO 639-1 language code (en, hi, ur, ar, es, fr, or code-mixed)
-- `edit_level`: Degree of human editing (none, light, or heavy)
-- `word_count`: Word count of the sample (range: 9 to 1,121; mean: ~262)
-- `generation_date`: Timestamp for when the sample was generated
-- `version`: Dataset version label
-
-**Class breakdown:** 335 AI-generated (49%), 181 human-written (26%), 170 post-edited AI (25%)
-
-**Missing data:** The `prompt` column has 181 null values, which correspond to the human-written samples — expected, since those weren't generated from a prompt.
-
-One important limitation is that post-edited samples vary in how much they were revised, making the boundary between AI and human authorship fuzzy for that category. Additionally, LLM writing styles evolve rapidly, which means detection patterns observed here may shift over time.
-
----
-
-# Data Exploration
-
-```{r, message=FALSE, warning=FALSE}
-library(tidyverse)
-library(ggplot2)
-library(dplyr)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
-data <- read.csv("ai_human_detection_v1.csv")
-colnames(data) <- trimws(colnames(data))
-colnames(data) <- make.names(colnames(data), unique = TRUE)
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
 ```
 
-```{r}
-str(data)
-nrow(data)
-ncol(data)
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
 ```
 
-```{r}
-summary(data$word_count)
-table(data$human_or_ai)
-table(data$domain)
-table(data$language)
-```
-
-```{r}
-colSums(is.na(data))
-```
-
-The dataset is clean and well-structured, with missing values only in the `prompt` column, which is expected. Word counts vary significantly across samples, suggesting that content type or domain may play a role in text length. Domains and languages are relatively balanced in sample count.
-
----
-
-# Research Question 1: How do word counts differ between content types, and does domain amplify those differences?
-
-Word count is one of the most accessible signals for content detection. We know that AI models tend to generate verbose responses to fill prompts, while human-written content, especially informal content like social media posts, tends to be shorter. This question asks not just whether differences exist, but whether domain moderates them — does AI write especially long Technical Blogs compared to humans? Are human social media posts especially short?
-
-```{r}
-library(dplyr)
-
-word_stats <- data %>%
-  group_by(human_or_ai) %>%
-  summarize(
-    mean_words = mean(word_count),
-    median_words = median(word_count),
-    sd_words = sd(word_count),
-    min_words = min(word_count),
-    max_words = max(word_count),
-    n = n()
-  )
-print(word_stats)
-```
-
-```{r, fig.width=8, fig.height=5}
-ggplot(data, aes(x = human_or_ai, y = word_count, fill = human_or_ai)) +
-  geom_violin(trim = FALSE, alpha = 0.7) +
-  geom_boxplot(width = 0.15, fill = "white", outlier.size = 1) +
-  scale_fill_manual(values = c("ai" = "#4E79A7", "human" = "#59A14F", "post_edited_ai" = "#F28E2B")) +
-  labs(
-    title = "Word Count Distribution by Content Type",
-    subtitle = "Violin plots show full distribution; inner boxplots show median and IQR",
-    x = "Content Type",
-    y = "Word Count",
-    fill = "Content Type"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "none")
-```
-
-```{r, fig.width=10, fig.height=5}
-ggplot(data, aes(x = domain, y = word_count, fill = human_or_ai)) +
-  geom_boxplot(outlier.size = 0.8) +
-  scale_fill_manual(values = c("ai" = "#4E79A7", "human" = "#59A14F", "post_edited_ai" = "#F28E2B"),
-                    labels = c("AI", "Human", "Post-Edited AI")) +
-  labs(
-    title = "Word Count by Domain and Content Type",
-    subtitle = "Does domain affect how different AI and human text lengths are?",
-    x = "Domain",
-    y = "Word Count",
-    fill = "Content Type"
-  ) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
-```
-
-Human-written content is strikingly short — with a median of just 33 words — compared to AI-generated content (median ~347 words) and post-edited AI (median ~256 words). This gap is consistent across domains, but Technical Blog and News content show the widest divergence between human and AI samples. The violin plots also reveal that AI content has a broader distribution, occasionally reaching over 1,000 words.
-
-The dramatic word count gap between human and AI samples is likely one of the strongest single-feature signals for detection in this dataset. Post-edited AI sits in between, suggesting that human revision reduces but does not fully eliminate AI verbosity.
-
----
-
-# Research Question 2: Which content types dominate each domain, and does that pattern hold across all three labels?
-
-Earlier analysis looked at AI percentage alone. Here we go deeper: how are all three content types (human, AI, post-edited AI) distributed across domains? Knowing the full breakdown matters because a domain with "low AI %" might actually have high post-edited AI content, which is arguably just as relevant for detection research.
-
-```{r}
-domain_full <- data %>%
-  group_by(domain, human_or_ai) %>%
-  summarize(count = n(), .groups = "drop") %>%
-  group_by(domain) %>%
-  mutate(percent = 100 * count / sum(count))
-
-print(domain_full)
-```
-
-```{r, fig.width=10, fig.height=5}
-ggplot(domain_full, aes(x = reorder(domain, -percent), y = percent, fill = human_or_ai)) +
-  geom_bar(stat = "identity", position = "fill") +
-  scale_y_continuous(labels = scales::percent) +
-  scale_fill_manual(
-    values = c("ai" = "#4E79A7", "human" = "#59A14F", "post_edited_ai" = "#F28E2B"),
-    labels = c("AI", "Human", "Post-Edited AI")
-  ) +
-  labs(
-    title = "Content Type Composition by Domain",
-    subtitle = "Proportional breakdown of human, AI, and post-edited AI across domains",
-    x = "Domain",
-    y = "Proportion",
-    fill = "Content Type"
-  ) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
-```
-
-```{r}
-domain_ai_pct <- data %>%
-  group_by(domain) %>%
-  summarize(
-    ai_percent = 100 * sum(human_or_ai == "ai") / n(),
-    post_edited_percent = 100 * sum(human_or_ai == "post_edited_ai") / n(),
-    human_percent = 100 * sum(human_or_ai == "human") / n()
-  ) %>%
-  arrange(desc(ai_percent))
-
-print(domain_ai_pct)
-```
-
-While AI-generated content hovers around 45–51% across all domains — a relatively uniform spread — the proportions of human and post-edited AI content vary more notably. Marketing has a higher share of post-edited AI (28%), while Technical Blog has a higher share of human text (29%). Education has the lowest share of pure AI content (44.7%), but the differences across domains are modest overall.
-
-The takeaway is that no single domain is "safe" from AI content — they all have roughly half AI-generated text. Detection systems cannot rely on domain alone as a filtering heuristic.
-
----
-
-# Research Question 3: How does language interact with content type and word length?
-
-Language is an underexplored dimension in most AI detection research. Models trained primarily on English may behave differently across other languages. We already know Hindi (hi) and English (en) have the highest AI percentages (~60% and ~57% respectively), while Spanish (es), French (fr), and code-mixed content cluster below 30%. But why?
-
-One hypothesis: AI models tend to generate longer outputs in some languages, which could inflate their AI percentages if the prompts were more demanding. Another: the dataset collection process may have sampled more human content for low-resource languages.
-
-```{r}
-lang_count <- data %>%
-  group_by(language) %>%
-  summarize(
-    total = n(),
-    ai = sum(human_or_ai == "ai"),
-    human = sum(human_or_ai == "human"),
-    post_edited = sum(human_or_ai == "post_edited_ai"),
-    ai_percent = 100 * ai / total,
-    median_wordcount_ai = median(word_count[human_or_ai == "ai"]),
-    median_wordcount_human = median(word_count[human_or_ai == "human"])
-  ) %>%
-  arrange(desc(ai_percent))
-
-print(lang_count)
-```
-
-```{r, fig.width=10, fig.height=5}
-lang_summary <- data %>%
-  group_by(language, human_or_ai) %>%
-  summarize(count = n(), .groups = "drop")
-
-ggplot(lang_summary, aes(x = reorder(language, -count), y = count, fill = human_or_ai)) +
-  geom_bar(stat = "identity") +
-  scale_fill_manual(
-    values = c("ai" = "#4E79A7", "human" = "#59A14F", "post_edited_ai" = "#F28E2B"),
-    labels = c("AI", "Human", "Post-Edited AI")
-  ) +
-  labs(
-    title = "Content Type Distribution by Language",
-    subtitle = "Absolute counts across all 7 language groups",
-    x = "Language",
-    y = "Number of Samples",
-    fill = "Content Type"
-  ) +
-  theme_minimal()
-```
-
-```{r, fig.width=10, fig.height=5}
-ggplot(data, aes(x = language, y = word_count, fill = human_or_ai)) +
-  geom_boxplot(outlier.size = 0.8) +
-  scale_fill_manual(
-    values = c("ai" = "#4E79A7", "human" = "#59A14F", "post_edited_ai" = "#F28E2B"),
-    labels = c("AI", "Human", "Post-Edited AI")
-  ) +
-  labs(
-    title = "Word Count by Language and Content Type",
-    subtitle = "Does word length vary differently for AI vs. human content across languages?",
-    x = "Language",
-    y = "Word Count",
-    fill = "Content Type"
-  ) +
-  theme_minimal()
-```
-
-The gap between AI and human word counts is present across all languages but varies in magnitude. For English, AI median word count is considerably higher than human, which mirrors the global pattern. The pattern is more compressed in code-mixed content, possibly because those samples tend to be shorter overall.
-
-Hindi and Urdu have the highest AI percentages in the dataset (60.6% and 53.8%). This may reflect that the dataset creators had more AI prompts in those languages, or that human-written content in those languages was harder to source at scale. Either way, detection systems need language-specific calibration — models tuned on English data alone will likely underperform on Hindi or Urdu.
-
----
-
-# Conclusion
-
-This analysis reveals several consistent patterns in the AI vs. Human Content Detection Dataset (2026 Edition):
-
-**Word count is a powerful signal.** Human-written samples are dramatically shorter (median 33 words) than AI-generated (median 347) or post-edited AI (median 256). This gap is consistent across all domains. If a detection system could only use one feature, word count would be a strong candidate.
-
-**Post-edited AI occupies a middle ground.** Its word counts and content type distributions suggest that human editing partially closes the gap between AI and human writing, but does not eliminate it. This is an important nuance for building realistic detection benchmarks.
-
-**Domain does not strongly separate content types.** AI content makes up roughly 45–51% of every domain. No domain is safe from AI-generated text, and domain-based filtering would not be a reliable detection strategy.
-
-**Language matters for AI rates, but the reasons are unclear.** Hindi and English have the highest AI percentages, while Spanish, French, and code-mixed text have the lowest. The word count gap between AI and human content also varies by language. Multilingual detection systems need to account for these differences rather than assuming one-size-fits-all behavior.
-
-Overall, this dataset highlights the complexity of AI content detection in real-world conditions — across domains, languages, and editing levels — and underscores the need for diverse, multilingual training data for detection tools.
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
